@@ -1,115 +1,152 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:poly_geofence_service/poly_geofence_service.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() => runApp(const ExampleApp());
+
+class ExampleApp extends StatefulWidget {
+  const ExampleApp({Key? key}) : super(key: key);
+
+  @override
+  _ExampleAppState createState() => _ExampleAppState();
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class _ExampleAppState extends State<ExampleApp> {
+  final _streamController = StreamController<PolyGeofence>();
 
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
+  // Create a [PolyGeofenceService] instance and set options.
+  final _polyGeofenceService = PolyGeofenceService.instance.setup(
+      interval: 5000,
+      accuracy: 100,
+      loiteringDelayMs: 60000,
+      statusChangeDelayMs: 10000,
+      allowMockLocations: false,
+      printDevLog: false);
+
+  // Create a [PolyGeofence] list.
+  final _polyGeofenceList = <PolyGeofence>[
+    PolyGeofence(
+      id: 'Yongdusan_Park',
+      data: {
+        'address': '37-55 Yongdusan-gil, Gwangbokdong 2(i)-ga, Jung-gu, Busan',
+        'about':
+            'Mountain park known for its 129m-high observation tower, statues & stone monuments.',
+      },
+      polygon: <LatLng>[
+        const LatLng(35.101727, 129.031665),
+        const LatLng(35.101815, 129.033458),
+        const LatLng(35.100032, 129.034055),
+        const LatLng(35.099324, 129.033811),
+        const LatLng(35.099906, 129.031927),
+        const LatLng(35.101080, 129.031534),
+      ],
+    ),
+  ];
+
+  // This function is to be called when the geofence status is changed.
+  Future<void> _onPolyGeofenceStatusChanged(PolyGeofence polyGeofence,
+      PolyGeofenceStatus polyGeofenceStatus, Location location) async {
+    print('polyGeofence: ${polyGeofence.toJson()}');
+    print('polyGeofenceStatus: ${polyGeofenceStatus.toString()}');
+    _streamController.sink.add(polyGeofence);
   }
-}
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  // This function is to be called when the location has changed.
+  void _onLocationChanged(Location location) {
+    print('location: ${location.toJson()}');
+  }
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
+  // This function is to be called when a location services status change occurs
+  // since the service was started.
+  void _onLocationServicesStatusChanged(bool status) {
+    print('isLocationServicesEnabled: $status');
+  }
 
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
+  // This function is used to handle errors that occur in the service.
+  void _onError(error) {
+    final errorCode = getErrorCodesFromError(error);
+    if (errorCode == null) {
+      print('Undefined error: $error');
+      return;
+    }
 
-  final String title;
+    print('ErrorCode: $errorCode');
+  }
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _polyGeofenceService
+          .addPolyGeofenceStatusChangeListener(_onPolyGeofenceStatusChanged);
+      _polyGeofenceService.addLocationChangeListener(_onLocationChanged);
+      _polyGeofenceService.addLocationServicesStatusChangeListener(
+          _onLocationServicesStatusChanged);
+      _polyGeofenceService.addStreamErrorListener(_onError);
+      _polyGeofenceService.start(_polyGeofenceList).catchError(_onError);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+    return MaterialApp(
+      // A widget used when you want to start a foreground task when trying to minimize or close the app.
+      // Declare on top of the [Scaffold] widget.
+      home: WillStartForegroundTask(
+        onWillStart: () async {
+          // You can add a foreground task start condition.
+          return _polyGeofenceService.isRunningService;
+        },
+        androidNotificationOptions: AndroidNotificationOptions(
+          channelId: 'geofence_service_notification_channel',
+          channelName: 'Geofence Service Notification',
+          channelDescription:
+              'This notification appears when the geofence service is running in the background.',
+          channelImportance: NotificationChannelImportance.LOW,
+          priority: NotificationPriority.LOW,
+          isSticky: false,
+        ),
+        foregroundTaskOptions: const ForegroundTaskOptions(
+          interval: 5000,
+        ),
+        iosNotificationOptions: const IOSNotificationOptions(),
+        notificationTitle: 'Geofence Service is running',
+        notificationText: 'Tap to return to the app',
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Poly Geofence Service'),
+            centerTitle: true,
+          ),
+          body: _buildContentView(),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+    );
+  }
+
+  @override
+  void dispose() {
+    _streamController.close();
+    super.dispose();
+  }
+
+  Widget _buildContentView() {
+    return StreamBuilder<PolyGeofence>(
+      stream: _streamController.stream,
+      builder: (context, snapshot) {
+        final updatedDateTime = DateTime.now();
+        final content = snapshot.data?.toJson().toString() ?? '';
+
+        return ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(8.0),
+          children: [
+            Text('•\t\tPolyGeofence (updated: $updatedDateTime)'),
+            const SizedBox(height: 10.0),
+            Text(content),
+          ],
+        );
+      },
     );
   }
 }
